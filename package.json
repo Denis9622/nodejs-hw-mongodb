@@ -5,12 +5,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "get-all": "node src/scripts/getAllContacts",
-    "generate": "node src/scripts/generateContacts.js",
-    "add-one": "node src/scripts/addOneContact.js",
-    "count": "node src/scripts/countContacts.js",
-    "remove-last": "node src/scripts/removeLastContact.js",
-    "remove-all": "node src/scripts/removeAllContacts.js"
+    "lint": "eslint src/**/*.js",
+    "start": "node src/index",
+    "dev": "nodemon src/index"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +22,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "mongoose": "^8.6.3",
+    "nodemon": "^3.1.7",
     "pino-http": "^10.3.0"
   }
 }
