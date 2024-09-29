@@ -1,3 +1,4 @@
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Шлях до .env файлу
-const envFilePath = path.resolve(__dirname, './.env');
+const envFilePath = path.resolve(__dirname, './../.env');
 
 export function parseEnv() {
   if (!fs.existsSync(envFilePath)) {

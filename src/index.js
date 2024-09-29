@@ -1,8 +1,8 @@
 import { parseEnv } from './env.js'; // Імпортуємо утиліту для парсингу
+
 import { setupServer } from './server.js';
 import { initMongoConnection } from './db/initMongoConnection.js';
 import './models/contact.js'; // Імпорт моделі для ініціалізації
-
 
 // Парсимо змінні оточення з файлу .env
 const envVars = parseEnv();
