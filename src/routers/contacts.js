@@ -5,24 +5,24 @@ import {
   getContactByIdController,
   createContactController,
   updateContactController,
-  deleteContactController, // Додаємо контролер для видалення контакту
+  deleteContactController,
 } from '../controllers/contacts.js';
 
 const router = express.Router();
 
 // Роут для отримання всіх контактів
-router.get('/contacts', ctrlWrapper(getContactsController));
+router.get('/', ctrlWrapper(getContactsController));
 
 // Роут для отримання контакту за ID
-router.get('/contacts/:contactId', ctrlWrapper(getContactByIdController));
+router.get('/:contactId', ctrlWrapper(getContactByIdController));
 
 // Роут для створення нового контакту
-router.post('/contacts', ctrlWrapper(createContactController));
+router.post('/', ctrlWrapper(createContactController));
 
 // Роут для оновлення існуючого контакту
-router.patch('/contacts/:contactId', ctrlWrapper(updateContactController));
+router.patch('/:contactId', ctrlWrapper(updateContactController));
 
-// ДОДАНО: Роут для видалення контакту за ID
-router.delete('/contacts/:contactId', ctrlWrapper(deleteContactController)); // Додано DELETE роут
+// Роут для видалення контакту за ID
+router.delete('/:contactId', ctrlWrapper(deleteContactController));
 
 export default router;
