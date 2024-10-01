@@ -1,4 +1,4 @@
-import Contact from '../models/contact.js'; // Імпорт моделі контакту
+import Contact from '../models/contact.js';
 
 // Сервіс для отримання всіх контактів
 export async function getAllContacts() {
@@ -33,7 +33,7 @@ export async function createContact(contactData) {
   }
 }
 
-// Сервіс для оновлення існуючого контакту за ID
+// Сервіс для оновлення контакту за ID
 export async function updateContactById(contactId, updateData) {
   try {
     const updatedContact = await Contact.findByIdAndUpdate(
@@ -48,7 +48,7 @@ export async function updateContactById(contactId, updateData) {
   }
 }
 
-// ДОДАНО: Сервіс для видалення контакту за ID
+// Сервіс для видалення контакту за ID
 export async function deleteContactById(contactId) {
   try {
     const deletedContact = await Contact.findByIdAndDelete(contactId);

@@ -3,9 +3,9 @@ import {
   getContactById,
   createContact,
   updateContactById,
-  deleteContactById, // Імпортуємо функцію для видалення контакту
+  deleteContactById,
 } from '../services/contacts.js';
-import createError from 'http-errors';
+import createHttpError from 'http-errors'; // Імпорт createHttpError для генерації помилок
 
 // Контролер для отримання всіх контактів
 export async function getContactsController(req, res, next) {
@@ -17,18 +17,19 @@ export async function getContactsController(req, res, next) {
       data: contacts,
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку далі в middleware
   }
 }
 
 // Контролер для отримання контакту за ID
 export async function getContactByIdController(req, res, next) {
   try {
-    const { contactId } = req.params;
+    const { contactId } = req.params; // Отримуємо contactId з параметрів запиту
     const contact = await getContactById(contactId);
 
     if (!contact) {
-      throw createError(404, 'Contact not found');
+      // Якщо контакт не знайдено, генеруємо помилку 404
+      throw createHttpError(404, 'Contact not found');
     }
 
     res.status(200).json({
@@ -37,7 +38,7 @@ export async function getContactByIdController(req, res, next) {
       data: contact,
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку в middleware
   }
 }
 
@@ -47,7 +48,8 @@ export async function createContactController(req, res, next) {
     const { name, phoneNumber, email, isFavourite, contactType } = req.body;
 
     if (!name || !phoneNumber || !contactType) {
-      throw createError(
+      // Якщо обов'язкові поля відсутні, генеруємо помилку 400
+      throw createHttpError(
         400,
         'Missing required fields: name, phoneNumber, or contactType',
       );
@@ -61,13 +63,14 @@ export async function createContactController(req, res, next) {
       contactType,
     });
 
+    // Повертаємо статус 201 і дані створеного контакту
     res.status(201).json({
       status: 201,
       message: 'Successfully created a contact!',
       data: newContact,
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку далі
   }
 }
 
@@ -80,7 +83,8 @@ export async function updateContactController(req, res, next) {
     const updatedContact = await updateContactById(contactId, updatedData);
 
     if (!updatedContact) {
-      throw createError(404, 'Contact not found');
+      // Якщо контакт не знайдено, генеруємо помилку 404
+      throw createHttpError(404, 'Contact not found');
     }
 
     res.status(200).json({
@@ -89,26 +93,23 @@ export async function updateContactController(req, res, next) {
       data: updatedContact,
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку далі
   }
 }
 
-// ДОДАНО: Контролер для видалення контакту
+// Контролер для видалення контакту
 export async function deleteContactController(req, res, next) {
   try {
     const { contactId } = req.params;
-
-    // Викликаємо сервіс для видалення контакту
     const deletedContact = await deleteContactById(contactId);
 
     if (!deletedContact) {
-      // Якщо контакт не знайдено, повертаємо помилку 404
-      throw createError(404, 'Contact not found');
+      // Якщо контакт не знайдено, генеруємо помилку 404
+      throw createHttpError(404, 'Contact not found');
     }
 
-    // Якщо видалення успішне, повертаємо статус 204 без тіла
-    res.status(204).send();
+    res.status(204).send(); // Повертаємо статус 204 без тіла відповіді
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку далі
   }
 }
