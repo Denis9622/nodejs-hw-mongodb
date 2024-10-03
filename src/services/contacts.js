@@ -1,14 +1,21 @@
 import Contact from '../models/contact.js';
 
-// Сервіс для отримання всіх контактів
-export async function getAllContacts() {
-  try {
-    const contacts = await Contact.find();
-    return contacts;
-  } catch (error) {
-    console.error('Error fetching contacts:', error);
-    throw new Error(`Error fetching contacts: ${error.message}`);
-  }
+// Додано: Нова функція для отримання контактів з пагінацією та сортуванням
+export async function getAllContactsWithPagination(
+  page,
+  perPage,
+  sortBy,
+  sortOrder,
+) {
+  const skip = (page - 1) * perPage; // Кількість елементів, які пропускаємо
+  const sortCriteria = { [sortBy]: sortOrder === 'desc' ? -1 : 1 }; // Додаємо сортування
+
+  const [contacts, totalItems] = await Promise.all([
+    Contact.find().skip(skip).limit(perPage).sort(sortCriteria), // Отримуємо контакти з врахуванням пагінації і сортування
+    Contact.countDocuments(), // Загальна кількість контактів
+  ]);
+
+  return { contacts, totalItems };
 }
 
 // Сервіс для отримання контакту за ID
