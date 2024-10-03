@@ -13,6 +13,7 @@ export function setupServer() {
   app.use(express.json()); // Для обробки JSON тіла запитів
 
   // Підключаємо маршрути для контактів
+
   app.use('/contacts', contactsRouter);
 
   // Middleware для обробки неіснуючих маршрутів
