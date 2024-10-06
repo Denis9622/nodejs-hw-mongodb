@@ -1,29 +1,32 @@
 import createHttpError from 'http-errors'; // Додаємо для роботи з помилками HTTP
 import Contact from '../models/contact.js';
 
-// Сервіс для отримання контактів з пагінацією та сортуванням
+// Сервіс для отримання контактів з пагінацією, сортуванням і фільтрацією
 export async function getAllContactsWithPagination(
   page,
   perPage,
   sortBy,
   sortOrder,
+  filter // Додаємо фільтр
 ) {
   try {
-    const skip = (page - 1) * perPage; // Пропускаємо певну кількість записів для пагінації
-    const sortCriteria = { [sortBy]: sortOrder }; // Застосовуємо сортування (-1 для desc, 1 для asc)
+    const skip = (page - 1) * perPage;
+    const sortCriteria = { [sortBy]: sortOrder };
 
-    // Отримуємо контакти з врахуванням пагінації та сортування
+    // Використовуємо фільтр у запиті до бази даних
     const [contacts, totalItems] = await Promise.all([
-      Contact.find().skip(skip).limit(perPage).sort(sortCriteria),
-      Contact.countDocuments(), // Підраховуємо загальну кількість контактів
+      Contact.find(filter).skip(skip).limit(perPage).sort(sortCriteria),
+      Contact.countDocuments(filter), // Підраховуємо кількість з фільтром
     ]);
 
     return { contacts, totalItems };
   } catch (error) {
-    console.error('Error fetching contacts:', error);
+    console.error('Error fetching contacts with filter:', error);
     throw createHttpError(500, 'Failed to retrieve contacts');
   }
 }
+
+
 
 // Сервіс для створення нового контакту
 export async function createContact(contactData) {
