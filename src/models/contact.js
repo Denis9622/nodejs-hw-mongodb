@@ -24,6 +24,11 @@ const contactSchema = new mongoose.Schema(
       required: [true, 'Contact type is required'],
       default: 'personal',
     },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // Связываем с коллекцией User
+      required: true, // Поле userId обязательно
+    },
   },
   {
     timestamps: true, // Додає createdAt та updatedAt автоматично
