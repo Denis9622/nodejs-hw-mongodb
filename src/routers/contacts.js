@@ -9,6 +9,7 @@ import {
 } from '../controllers/contacts.js';
 import { validateBody } from '../middlewares/validateBody.js';
 import { isValidId } from '../middlewares/isValidId.js';
+import { authenticate } from '../middlewares/authenticate.js'; // Импортируем middleware для аутентификации
 import {
   contactSchema,
   updateContactSchema,
@@ -16,21 +17,23 @@ import {
 
 const router = express.Router();
 
-// Роут для отримання всіх контактів з пагінацією та сортуванням
-// ДОДАНО: можливість отримувати контакти за сторінками через query параметри `page`, `perPage`, `sortBy`, `sortOrder`
+// Применяем middleware authenticate ко всем маршрутам контактов
+router.use(authenticate);
+
+// Роут для получения всех контактов с пагинацией и сортировкой
 router.get('/', ctrlWrapper(getContactsController));
 
-// Роут для отримання контакту за ID (перевіряємо валідність ID)
+// Роут для получения контакта по ID (валидация ID)
 router.get('/:contactId', isValidId, ctrlWrapper(getContactByIdController));
 
-// Роут для створення нового контакту (валидація тіла)
+// Роут для создания нового контакта (валидация тела запроса)
 router.post(
   '/',
   validateBody(contactSchema),
   ctrlWrapper(createContactController),
 );
 
-// Роут для оновлення контакту (валидація ID і тіла)
+// Роут для обновления контакта (валидация ID и тела)
 router.patch(
   '/:contactId',
   isValidId,
@@ -38,7 +41,7 @@ router.patch(
   ctrlWrapper(updateContactController),
 );
 
-// Роут для видалення контакту (валидація ID)
+// Роут для удаления контакта (валидация ID)
 router.delete('/:contactId', isValidId, ctrlWrapper(deleteContactController));
 
 export default router;

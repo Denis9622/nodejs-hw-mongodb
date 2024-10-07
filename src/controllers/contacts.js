@@ -7,50 +7,52 @@ import {
   deleteContactById,
 } from '../services/contacts.js';
 
-// Контролер для отримання всіх контактів з пагінацією і сортуванням
+// Контроллер для получения всех контактов с пагинацией и сортировкой
 export async function getContactsController(req, res, next) {
   try {
-    // Отримуємо значення page, perPage, sortBy і sortOrder з query параметрів
-    const page = parseInt(req.query.page, 10) || 1; // Номер сторінки, за замовчуванням 1
-    const perPage = parseInt(req.query.perPage, 10) || 10; // Кількість елементів на сторінці, за замовчуванням 10
-    const sortBy = req.query.sortBy || 'name'; // Поле для сортування, за замовчуванням 'name'
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1; // Порядок сортування (1 для asc, -1 для desc)
+    const userId = req.user._id; // Получаем ID текущего пользователя
+    const page = parseInt(req.query.page, 10) || 1;
+    const perPage = parseInt(req.query.perPage, 10) || 10;
+    const sortBy = req.query.sortBy || 'name';
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
 
-    // Отримуємо контакти з сервісу з врахуванням пагінації і сортування
+    // Получаем только контакты, принадлежащие текущему пользователю
     const { contacts, totalItems } = await getAllContactsWithPagination(
       page,
       perPage,
       sortBy,
       sortOrder,
+      userId, // Передаем userId в сервис
     );
 
-    // Визначаємо загальну кількість сторінок
     const totalPages = Math.ceil(totalItems / perPage);
 
-    // Формуємо відповідь з інформацією про пагінацію і сортування
     res.status(200).json({
       status: 200,
       message: 'Successfully found contacts!',
       data: {
-        data: contacts, // Масив контактів на поточній сторінці
-        page, // Поточна сторінка
-        perPage, // Кількість елементів на сторінці
-        totalItems, // Загальна кількість контактів
-        totalPages, // Загальна кількість сторінок
-        hasPreviousPage: page > 1, // Чи є попередня сторінка
-        hasNextPage: page < totalPages, // Чи є наступна сторінка
+        data: contacts,
+        page,
+        perPage,
+        totalItems,
+        totalPages,
+        hasPreviousPage: page > 1,
+        hasNextPage: page < totalPages,
       },
     });
   } catch (error) {
-    next(error); // Передаємо помилку в middleware для обробки
+    next(error);
   }
 }
 
-// Контролер для отримання контакту за ID
+// Контроллер для получения контакта по ID
 export async function getContactByIdController(req, res, next) {
   try {
+    const userId = req.user._id; // ID текущего пользователя
     const { contactId } = req.params;
-    const contact = await getContactById(contactId);
+
+    // Получаем только контакт текущего пользователя
+    const contact = await getContactById(contactId, userId);
 
     if (!contact) {
       throw createHttpError(404, 'Contact not found');
@@ -66,10 +68,14 @@ export async function getContactByIdController(req, res, next) {
   }
 }
 
-// Контролер для створення нового контакту
+// Контроллер для создания нового контакта
 export async function createContactController(req, res, next) {
   try {
-    const newContact = await createContact(req.body);
+    const userId = req.user._id; // Получаем ID текущего пользователя
+    const contactData = { ...req.body, userId }; // Добавляем userId к данным контакта
+
+    const newContact = await createContact(contactData);
+
     res.status(201).json({
       status: 201,
       message: 'Successfully created a contact!',
@@ -80,11 +86,14 @@ export async function createContactController(req, res, next) {
   }
 }
 
-// Контролер для оновлення існуючого контакту
+// Контроллер для обновления существующего контакта
 export async function updateContactController(req, res, next) {
   try {
+    const userId = req.user._id; // Получаем ID текущего пользователя
     const { contactId } = req.params;
-    const updatedContact = await updateContactById(contactId, req.body);
+
+    // Обновляем только контакт текущего пользователя
+    const updatedContact = await updateContactById(contactId, userId, req.body);
 
     if (!updatedContact) {
       throw createHttpError(404, 'Contact not found');
@@ -100,17 +109,20 @@ export async function updateContactController(req, res, next) {
   }
 }
 
-// Контролер для видалення контакту
+// Контроллер для удаления контакта
 export async function deleteContactController(req, res, next) {
   try {
+    const userId = req.user._id; // Получаем ID текущего пользователя
     const { contactId } = req.params;
-    const deletedContact = await deleteContactById(contactId);
+
+    // Удаляем только контакт текущего пользователя
+    const deletedContact = await deleteContactById(contactId, userId);
 
     if (!deletedContact) {
       throw createHttpError(404, 'Contact not found');
     }
 
-    res.status(204).send(); // Статус 204 без тіла відповіді
+    res.status(204).send(); // Статус 204 без тела ответа
   } catch (error) {
     next(error);
   }

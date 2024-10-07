@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import pino from 'pino-http';
-import contactsRouter from './routers/contacts.js';
+import contactsRouter from './routers/contacts.js'; // Импорт маршрутов для контактов
+import authRouter from './routers/auth.js'; // Импорт маршрутов для аутентификации
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 
@@ -10,14 +11,18 @@ export function setupServer() {
 
   app.use(cors());
   app.use(pino());
-  app.use(express.json()); // Для обробки JSON тіла запитів
+  app.use(express.json()); // Для обработки JSON тела запросов
 
+  // Маршрут для контактов
   app.use('/contacts', contactsRouter);
 
-  // Middleware для обробки неіснуючих маршрутів
+  // Маршрут для аутентификации (например, /auth/login и /auth/register)
+  app.use('/auth', authRouter); // Добавлен роутер для аутентификации
+
+  // Middleware для обработки несуществующих маршрутов
   app.use(notFoundHandler);
 
-  // Middleware для обробки помилок
+  // Middleware для обработки ошибок
   app.use(errorHandler);
 
   const PORT = process.env.PORT || 3000;
