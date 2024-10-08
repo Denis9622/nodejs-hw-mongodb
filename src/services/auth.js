@@ -1,140 +1,179 @@
-// src/services/auth.js
-
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import createHttpError from 'http-errors';
+import path from 'path';
+import fs from 'fs/promises';
+import handlebars from 'handlebars';
+import { sendEMail } from '../utils/sendMail.js'; // Импортируем сервис отправки почты
 import User from '../models/user.js'; // Импорт модели пользователя
 import Session from '../models/session.js'; // Импорт модели сессии
 
-// Сервис для регистрации пользователя
+// Константы для работы с токенами и паролями
+const JWT_SECRET = process.env.JWT_SECRET || 'secretKey'; // Секретный ключ для токенов
+const ACCESS_TOKEN_EXPIRES_IN = '15m'; // Время жизни access токена
+const REFRESH_TOKEN_EXPIRES_IN = '30d'; // Время жизни refresh токена
+const RESET_TOKEN_EXPIRES_IN = '15m'; // Время жизни токена сброса пароля
+const RESET_PASSWORD_TEMPLATES_DIR = './path_to_templates_dir'; // Путь к шаблонам для сброса пароля
+
+// =========================== Сервис для регистрации пользователя ===========================
 export async function registerUser({ name, email, password }) {
-  // Проверка, существует ли пользователь с таким email
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    throw createHttpError(409, 'Email in use'); // Если email уже существует, возвращаем ошибку 409
+    throw createHttpError(409, 'Email in use');
   }
 
-  // Хеширование пароля перед сохранением
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  // Создание нового пользователя
-  const newUser = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-  });
-
-  return newUser; // Возвращаем созданного пользователя
+  const hashedPassword = await bcrypt.hash(password, 10); // Хеширование пароля
+  const newUser = await User.create({ name, email, password: hashedPassword });
+  return newUser;
 }
 
-// Сервис для логина пользователя
+// =========================== Сервис для логина пользователя ===========================
 export async function loginUser({ email, password }) {
-  // Ищем пользователя по email
   const user = await User.findOne({ email });
   if (!user) {
-    throw createHttpError(401, 'Invalid email or password'); // Ошибка 401, если email не найден
+    throw createHttpError(401, 'Invalid email or password');
   }
 
-  // Проверяем пароль
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw createHttpError(401, 'Invalid email or password'); // Ошибка 401, если пароль неверный
+    throw createHttpError(401, 'Invalid email or password');
   }
 
-  // Генерируем access и refresh токены
-  const accessToken = jwt.sign(
-    { userId: user._id },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: '15m' }, // Время жизни access токена — 15 минут
-  );
+  const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+  });
+  const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
+    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+  });
 
-  const refreshToken = jwt.sign(
-    { userId: user._id },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: '30d' }, // Время жизни refresh токена — 30 дней
-  );
-
-  // Удаляем старую сессию (если есть)
   await Session.findOneAndDelete({ userId: user._id });
-
-  // Создаем новую сессию
   await Session.create({
     userId: user._id,
     accessToken,
     refreshToken,
-    accessTokenValidUntil: new Date(Date.now() + 15 * 60 * 1000), // 15 минут
-    refreshTokenValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 дней
+    accessTokenValidUntil: new Date(Date.now() + 15 * 60 * 1000),
+    refreshTokenValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
 
-  return { accessToken, refreshToken }; // Возвращаем токены
+  return { accessToken, refreshToken };
 }
 
-// Сервис для обновления сессии по refresh токену
+// =========================== Сервис для генерации токена сброса пароля ===========================
+export const requestResetToken = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw createHttpError(404, 'User not found');
+  }
+
+  // Генерация токена сброса пароля
+  const resetToken = jwt.sign({ sub: user._id, email }, JWT_SECRET, {
+    expiresIn: RESET_TOKEN_EXPIRES_IN,
+  });
+
+  // Чтение шаблона письма для сброса пароля
+  const resetPasswordTemplatePath = path.join(
+    RESET_PASSWORD_TEMPLATES_DIR,
+    'reset-password-email.html',
+  );
+  const templateSource = (
+    await fs.readFile(resetPasswordTemplatePath)
+  ).toString();
+  const template = handlebars.compile(templateSource);
+
+  // Создание HTML контента письма
+  const html = template({
+    name: user.name,
+    link: `${process.env.APP_DOMAIN}/reset-password?token=${resetToken}`,
+  });
+
+  // Отправка письма
+  await sendEMail({
+    from: process.env.SMTP_FROM,
+    to: email,
+    subject: 'Reset your password',
+    html,
+  });
+};
+
+// =========================== Сервис для сброса пароля ===========================
+export const resetPassword = async (payload) => {
+  let decoded;
+
+  try {
+    // Проверка и верификация токена сброса пароля
+    decoded = jwt.verify(payload.token, JWT_SECRET);
+  } catch (err) {
+    console.error(err);
+    throw createHttpError(401, 'Invalid or expired token');
+  }
+
+  // Поиск пользователя по decoded email и id
+  const user = await User.findOne({ email: decoded.email, _id: decoded.sub });
+  if (!user) {
+    throw createHttpError(404, 'User not found');
+  }
+
+  // Хеширование нового пароля
+  const encryptedPassword = await bcrypt.hash(payload.password, 10);
+  await User.updateOne({ _id: user._id }, { password: encryptedPassword });
+};
+
+// =========================== Сервис для обновления сессии ===========================
 export async function refreshSession(refreshToken) {
   try {
-    // Проверяем валидность refresh токена
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-
-    // Ищем пользователя по ID
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
     const user = await User.findById(decoded.userId);
     if (!user) {
       throw createHttpError(401, 'User not found');
     }
 
-    // Удаляем старую сессию
     await Session.findOneAndDelete({ userId: user._id, refreshToken });
 
-    // Генерируем новые access и refresh токены
     const newAccessToken = generateAccessToken(user._id);
     const newRefreshToken = generateRefreshToken(user._id);
 
-    // Создаем новую сессию
     await Session.create({
       userId: user._id,
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      accessTokenValidUntil: new Date(Date.now() + 15 * 60 * 1000), // 15 минут
-      refreshTokenValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 дней
+      accessTokenValidUntil: new Date(Date.now() + 15 * 60 * 1000),
+      refreshTokenValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    return { accessToken: newAccessToken, refreshToken: newRefreshToken }; // Возвращаем новые токены
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   } catch (error) {
-    console.error('Error during session refresh:', error.message); // Логируем сообщение об ошибке
-    throw createHttpError(401, 'Invalid refresh token'); // Ошибка 401 при невалидном токене
+    console.error(error);
+    throw createHttpError(401, 'Invalid refresh token');
   }
 }
 
-// Вспомогательная функция для генерации access токена
+// =========================== Вспомогательные функции ===========================
 function generateAccessToken(userId) {
-  return jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
-    expiresIn: '15m', // Время жизни access токена — 15 минут
+  return jwt.sign({ userId }, JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }
 
-// Вспомогательная функция для генерации refresh токена
 function generateRefreshToken(userId) {
-  return jwt.sign({ userId }, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: '30d', // Время жизни refresh токена — 30 дней
+  return jwt.sign({ userId }, JWT_SECRET, {
+    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
   });
 }
 
-// Сервис для логаута пользователя
+// =========================== Сервис для логаута пользователя ===========================
 export async function logoutUser(refreshToken) {
   try {
-    // Проверяем валидность refresh токена
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-
-    // Удаляем сессию на основе userId и refreshToken
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
     const session = await Session.findOneAndDelete({
       userId: decoded.userId,
       refreshToken,
     });
 
     if (!session) {
-      throw createHttpError(404, 'Session not found'); // Ошибка 404, если сессия не найдена
+      throw createHttpError(404, 'Session not found');
     }
   } catch (error) {
-    console.error('Error during logout:', error.message); // Логирование ошибки
-    throw createHttpError(401, 'Invalid token or session'); // Ошибка 401 при неверном токене или отсутствии сессии
+    console.error(error);
+    throw createHttpError(401, 'Invalid token or session');
   }
 }
