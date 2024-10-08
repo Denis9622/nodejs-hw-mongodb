@@ -3,6 +3,8 @@ import Session from '../models/session.js'; // Импортируем модел
 import createHttpError from 'http-errors'; // Для создания HTTP ошибок
 import bcrypt from 'bcrypt'; // Для хеширования паролей
 import jwt from 'jsonwebtoken'; // Для работы с JWT токенами
+import { requestResetToken, resetPassword } from '../services/auth.js';
+
 
 // Секреты и настройки для токенов (обычно их хранят в переменных окружения)
 const JWT_SECRET = process.env.JWT_SECRET || 'secretKey'; // Секрет для JWT токенов
@@ -195,3 +197,35 @@ export async function logoutUserController(req, res, next) {
     next(error); // Передаем ошибку в следующий middleware для обработки
   }
 }
+
+// Контроллер для отправки email с токеном для сброса пароля
+export const requestResetEmailController = async (req, res, next) => {
+  try {
+    await requestResetToken(req.body.email);
+    res.json({
+      status: 200,
+      message: 'Reset password email was successfully sent!',
+      data: {},
+    });
+  } catch (error) {
+    next(error); // Передаем ошибку в следующий middleware для обработки
+  }
+};
+
+// Контроллер для сброса пароля
+export const resetPasswordController = async (req, res, next) => {
+  try {
+    await resetPassword(req.body);
+    res.json({
+      message: 'Password was successfully reset!',
+      status: 200,
+      data: {},
+    });
+  } catch (error) {
+    next(error); // Передаем ошибку в следующий middleware для обработки
+  }
+};
+
+
+
+
