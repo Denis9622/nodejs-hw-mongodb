@@ -7,7 +7,7 @@ import {
   deleteContactById,
 } from '../services/contacts.js';
 
-// Контроллер для отримання всіх контактів з пагінацією і сортуванням
+// Контролер для отримання всіх контактів з пагінацією і сортуванням
 export async function getContactsController(req, res, next) {
   try {
     // Перевіряємо, чи пройшла аутентифікація і чи є користувач у запиті
@@ -26,7 +26,7 @@ export async function getContactsController(req, res, next) {
       perPage,
       sortBy,
       sortOrder,
-      { userId: req.user._id } // Фільтр для вибірки контактів тільки поточного користувача
+      { userId: req.user._id }, // Фільтр для вибірки контактів тільки поточного користувача
     );
 
     const totalPages = Math.ceil(totalItems / perPage);
@@ -50,14 +50,13 @@ export async function getContactsController(req, res, next) {
   }
 }
 
-
-// Контроллер для получения контакта по ID
+// Контролер для отримання контакту за ID
 export async function getContactByIdController(req, res, next) {
   try {
-    const userId = req.user._id; // ID текущего пользователя
+    const userId = req.user._id; // ID поточного користувача
     const { contactId } = req.params;
 
-    // Получаем только контакт текущего пользователя
+    // Отримуємо лише контакт поточного користувача
     const contact = await getContactById(contactId, userId);
 
     if (!contact) {
@@ -74,11 +73,11 @@ export async function getContactByIdController(req, res, next) {
   }
 }
 
-// Контроллер для создания нового контакта
+// Контролер для створення нового контакту
 export async function createContactController(req, res, next) {
   try {
-    const userId = req.user._id; // Получаем ID текущего пользователя
-    const contactData = { ...req.body, userId }; // Добавляем userId к данным контакта
+    const userId = req.user._id; // Отримуємо ID поточного користувача
+    const contactData = { ...req.body, userId }; // Додаємо userId до даних контакту
 
     const newContact = await createContact(contactData);
 
@@ -92,13 +91,13 @@ export async function createContactController(req, res, next) {
   }
 }
 
-// Контроллер для обновления существующего контакта
+// Контролер для оновлення існуючого контакту
 export async function updateContactController(req, res, next) {
   try {
-    const userId = req.user._id; // Получаем ID текущего пользователя
+    const userId = req.user._id; // Отримуємо ID поточного користувача
     const { contactId } = req.params;
 
-    // Обновляем только контакт текущего пользователя
+    // Оновлюємо лише контакт поточного користувача
     const updatedContact = await updateContactById(contactId, userId, req.body);
 
     if (!updatedContact) {
@@ -115,20 +114,20 @@ export async function updateContactController(req, res, next) {
   }
 }
 
-// Контроллер для удаления контакта
+// Контролер для видалення контакту
 export async function deleteContactController(req, res, next) {
   try {
-    const userId = req.user._id; // Получаем ID текущего пользователя
+    const userId = req.user._id; // Отримуємо ID поточного користувача
     const { contactId } = req.params;
 
-    // Удаляем только контакт текущего пользователя
+    // Видаляємо лише контакт поточного користувача
     const deletedContact = await deleteContactById(contactId, userId);
 
     if (!deletedContact) {
       throw createHttpError(404, 'Contact not found');
     }
 
-    res.status(204).send(); // Статус 204 без тела ответа
+    res.status(204).send(); // Статус 204 без тіла відповіді
   } catch (error) {
     next(error);
   }
