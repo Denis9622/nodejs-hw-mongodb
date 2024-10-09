@@ -177,12 +177,15 @@ export async function logoutUserController(req, res, next) {
 
     // Проверяем, передан ли refresh токен
     if (!refreshToken) {
-      throw createHttpError(401, 'Отсутствует refresh токен'); // Ошибка 401, если токен отсутствует
+      throw createHttpError(401, 'Refresh token required'); // Ошибка 401, если токен отсутствует
     }
 
-    // Удаляем сессию с этим refresh токеном из базы данных
-    await Session.findOneAndDelete({ refreshToken });
+    // Видаляємо сесію з бази даних
+    const session = await Session.findOneAndDelete({ refreshToken });
 
+    if (!session) {
+      throw createHttpError(404, 'Session not found');
+    }
     // Очищаем cookies с refresh токеном
     res.clearCookie('refreshToken', {
       httpOnly: true,
