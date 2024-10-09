@@ -16,7 +16,7 @@ export async function getAllContactsWithPagination(
     // Використовуємо фільтр у запиті до бази даних
     const [contacts, totalItems] = await Promise.all([
       Contact.find(filter).skip(skip).limit(perPage).sort(sortCriteria),
-      Contact.countDocuments(filter), // Підраховуємо кількість з фільтром
+      Contact.countDocuments(filter), // Підраховуємо кількість документів з фільтром
     ]);
 
     return { contacts, totalItems };
