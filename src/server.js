@@ -5,10 +5,14 @@ import contactsRouter from './routers/contacts.js'; // Импорт маршру
 import authRouter from './routers/auth.js'; // Импорт маршрутов для аутентификации
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
+import cookieParser from 'cookie-parser';
+
 
 export function setupServer() {
   const app = express();
 
+  // Додайте middleware cookieParser перед іншими роутами
+  app.use(cookieParser());
   app.use(cors());
   app.use(pino());
   app.use(express.json()); // Для обработки JSON тела запросов
