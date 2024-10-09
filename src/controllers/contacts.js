@@ -7,31 +7,36 @@ import {
   deleteContactById,
 } from '../services/contacts.js';
 
-// Контроллер для получения всех контактов с пагинацией и сортировкой
+// Контроллер для отримання всіх контактів з пагінацією і сортуванням
 export async function getContactsController(req, res, next) {
   try {
-    const userId = req.user._id; // Получаем ID текущего пользователя
+    // Перевіряємо, чи пройшла аутентифікація і чи є користувач у запиті
+    if (!req.user || !req.user._id) {
+      throw createHttpError(401, 'Authentication required');
+    }
+
     const page = parseInt(req.query.page, 10) || 1;
     const perPage = parseInt(req.query.perPage, 10) || 10;
     const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
 
-    // Получаем только контакты, принадлежащие текущему пользователю
+    // Отримуємо лише контакти, які належать поточному користувачеві
     const { contacts, totalItems } = await getAllContactsWithPagination(
       page,
       perPage,
       sortBy,
       sortOrder,
-      userId, // Передаем userId в сервис
+      { userId: req.user._id } // Фільтр для вибірки контактів тільки поточного користувача
     );
 
     const totalPages = Math.ceil(totalItems / perPage);
 
+    // Відправляємо успішну відповідь із даними
     res.status(200).json({
       status: 200,
       message: 'Successfully found contacts!',
       data: {
-        data: contacts,
+        contacts, // Масив контактів користувача
         page,
         perPage,
         totalItems,
@@ -41,9 +46,10 @@ export async function getContactsController(req, res, next) {
       },
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаємо помилку в middleware для обробки
   }
 }
+
 
 // Контроллер для получения контакта по ID
 export async function getContactByIdController(req, res, next) {
