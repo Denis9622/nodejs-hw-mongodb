@@ -1,5 +1,5 @@
-import createHttpError from 'http-errors'; // Додаємо для роботи з помилками HTTP
-import Contact from '../models/contact.js';
+import createHttpError from 'http-errors'; // Для роботи з HTTP-помилками
+import Contact from '../models/contact.js'; // Імпорт моделі Contact
 
 // Сервіс для отримання контактів з пагінацією, сортуванням і фільтрацією
 export async function getAllContactsWithPagination(
@@ -7,7 +7,7 @@ export async function getAllContactsWithPagination(
   perPage,
   sortBy,
   sortOrder,
-  filter // Додаємо фільтр
+  filter, // Додаємо фільтр
 ) {
   try {
     const skip = (page - 1) * perPage;
@@ -26,8 +26,6 @@ export async function getAllContactsWithPagination(
   }
 }
 
-
-
 // Сервіс для створення нового контакту
 export async function createContact(contactData) {
   try {
@@ -39,13 +37,13 @@ export async function createContact(contactData) {
   }
 }
 
-// Сервіс для оновлення контакту за ID
-export async function updateContactById(contactId, updateData) {
+// Сервіс для оновлення контакту за ID та userId
+export async function updateContactById(contactId, userId, updateData) {
   try {
-    const updatedContact = await Contact.findByIdAndUpdate(
-      contactId,
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id: contactId, userId }, // Пошук за ID і userId
       updateData,
-      { new: true, runValidators: true }, // Застосовуємо валідацію і повертаємо новий об'єкт
+      { new: true, runValidators: true }, // Повертаємо оновлений контакт і застосовуємо валідацію
     );
 
     if (!updatedContact) {
@@ -59,10 +57,13 @@ export async function updateContactById(contactId, updateData) {
   }
 }
 
-// Сервіс для видалення контакту за ID
-export async function deleteContactById(contactId) {
+// Сервіс для видалення контакту за ID та userId
+export async function deleteContactById(contactId, userId) {
   try {
-    const deletedContact = await Contact.findByIdAndDelete(contactId);
+    const deletedContact = await Contact.findOneAndDelete({
+      _id: contactId,
+      userId, // Перевіряємо, що контакт належить поточному користувачу
+    });
 
     if (!deletedContact) {
       throw createHttpError(404, 'Contact not found');
@@ -74,10 +75,11 @@ export async function deleteContactById(contactId) {
     throw createHttpError(500, 'Failed to delete contact');
   }
 }
-// Сервіс для отримання контакту за ID
-export async function getContactById(contactId) {
+
+// Сервіс для отримання контакту за ID та userId
+export async function getContactById(contactId, userId) {
   try {
-    const contact = await Contact.findById(contactId);
+    const contact = await Contact.findOne({ _id: contactId, userId }); // Пошук за ID і userId
     if (!contact) {
       throw createHttpError(404, 'Contact not found');
     }
