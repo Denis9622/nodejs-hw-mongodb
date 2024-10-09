@@ -17,7 +17,7 @@ export async function createUserController(req, res, next) {
     // Проверяем, существует ли пользователь с таким email
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      throw createHttpError(400, 'User with this email already exists'); // Если пользователь существует, возвращаем ошибку
+      throw createHttpError(409, 'Email in use'); // Ошибка 409, если email уже используется
     }
 
     // Хешируем пароль перед сохранением
