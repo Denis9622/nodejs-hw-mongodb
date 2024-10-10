@@ -5,6 +5,12 @@ import jwt from 'jsonwebtoken';
 import createHttpError from 'http-errors';
 import User from '../models/user.js'; // Импорт модели пользователя
 import Session from '../models/session.js'; // Импорт модели сессии
+import { SMTP, TEMPLATES_DIR } from '../constants/contacts-constants.js';
+import path from 'node:path';
+import handlebars from 'handlebars';
+
+import fs from 'node:fs/promises';
+
 import { sendEMail } from '../utils/sendMail.js'; // Оновлений шлях до файлу sendMail
 import UsersCollection from '../models/user.js';
 import { env } from './../env.js';
@@ -142,34 +148,44 @@ export async function logoutUser(refreshToken) {
     throw createHttpError(401, 'Invalid token or session'); // Ошибка 401 при неверном токене или отсутствии сессии
   }
 }
-//Роут для надсилання запиту на скидання паролю
 export const requestResetToken = async (email) => {
   const user = await UsersCollection.findOne({ email });
   if (!user) {
-    throw createHttpError(404, 'User not found!');
+    throw createHttpError(404, 'User not found');
   }
 
-  // Генерація JWT токена з терміном дії 5 хвилин
-  const resetToken = jwt.sign({ sub: user._id, email }, env('JWT_SECRET'), {
-    expiresIn: '5m',
+  const resetToken = jwt.sign(
+    {
+      sub: user._id,
+      email,
+    },
+    env('JWT_SECRET'),
+    {
+      expiresIn: '15m',
+    },
+  );
+
+  const resetPasswordTemplatePath = path.join(
+    TEMPLATES_DIR,
+    'reset-password-email.html',
+  );
+
+  const templateSource = (
+    await fs.readFile(resetPasswordTemplatePath)
+  ).toString();
+
+  const template = handlebars.compile(templateSource);
+  const html = template({
+    name: user.name,
+    link: `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`,
   });
 
-  const resetLink = `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`;
-
-  // Надсилання листа
-  try {
-    await sendEMail({
-      from: env('SMTP_FROM'),
-      to: email,
-      subject: 'Reset your password',
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password!</p>`,
-    });
-  } catch {
-    throw createHttpError(
-      500,
-      'Failed to send the email, please try again later.',
-    );
-  }
+  await sendEMail({
+    from: env(SMTP.SMTP_FROM),
+    to: email,
+    subject: 'Reset your password',
+    html,
+  });
 };
 //Роут для оновлення паролю
 export const resetPassword = async (token, newPassword) => {
