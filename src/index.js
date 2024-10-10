@@ -1,12 +1,10 @@
-import { parseEnv } from './env.js'; // Імпортуємо утиліту для парсингу
+import dotenv from 'dotenv'; // Підключаємо dotenv для автоматичного завантаження змінних з .env
 import { setupServer } from './server.js';
 import { initMongoConnection } from './db/initMongoConnection.js';
 import './models/contact.js'; // Імпорт моделі для ініціалізації
 
-
-// Парсимо змінні оточення з файлу .env
-const envVars = parseEnv();
-process.env = { ...process.env, ...envVars }; // Зберігаємо змінні в process.env
+// Завантажуємо змінні середовища з .env файлу
+dotenv.config(); 
 
 // Ініціалізуємо підключення до MongoDB і сервер
 (async () => {

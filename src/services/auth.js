@@ -5,6 +5,10 @@ import jwt from 'jsonwebtoken';
 import createHttpError from 'http-errors';
 import User from '../models/user.js'; // Импорт модели пользователя
 import Session from '../models/session.js'; // Импорт модели сессии
+import { sendEMail } from '../utils/sendMail.js'; // Оновлений шлях до файлу sendMail
+import UsersCollection from '../models/user.js';
+import { env } from './../env.js';
+
 
 // Сервис для регистрации пользователя
 export async function registerUser({ name, email, password }) {
@@ -138,3 +142,61 @@ export async function logoutUser(refreshToken) {
     throw createHttpError(401, 'Invalid token or session'); // Ошибка 401 при неверном токене или отсутствии сессии
   }
 }
+//Роут для надсилання запиту на скидання паролю
+export const requestResetToken = async (email) => {
+  const user = await UsersCollection.findOne({ email });
+  if (!user) {
+    throw createHttpError(404, 'User not found!');
+  }
+
+  // Генерація JWT токена з терміном дії 5 хвилин
+  const resetToken = jwt.sign({ sub: user._id, email }, env('JWT_SECRET'), {
+    expiresIn: '5m',
+  });
+
+  const resetLink = `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`;
+
+  // Надсилання листа
+  try {
+    await sendEMail({
+      from: env('SMTP_FROM'),
+      to: email,
+      subject: 'Reset your password',
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password!</p>`,
+    });
+  } catch {
+    throw createHttpError(
+      500,
+      'Failed to send the email, please try again later.',
+    );
+  }
+};
+//Роут для оновлення паролю
+export const resetPassword = async (token, newPassword) => {
+  try {
+    const decoded = jwt.verify(token, env('JWT_SECRET'));
+    const user = await UsersCollection.findOne({ email: decoded.email });
+
+    if (!user) {
+      throw createHttpError(404, 'User not found!');
+    }
+
+    // Оновлення паролю
+    user.password = newPassword;
+    await user.save();
+
+    // Видалення сесій користувача
+    await Session.deleteMany({ userId: user._id });
+
+    return user;
+  } catch (error) {
+    if (
+      error.name === 'TokenExpiredError' ||
+      error.name === 'JsonWebTokenError'
+    ) {
+      throw createHttpError(401, 'Token is expired or invalid.');
+    }
+    throw error;
+  }
+};
+

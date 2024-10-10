@@ -6,12 +6,16 @@ import { validateBody } from '../middlewares/validateBody.js'; // Middleware д�
 import {
   userRegisterSchema,
   userLoginSchema,
+  requestResetEmailSchema,
+  resetPasswordSchema,
 } from '../validation/userValidation.js'; // Схемы валидации
 import {
   createUserController,
   loginUserController,
   refreshSessionController,
   logoutUserController,
+  requestResetEmailController,
+  resetPasswordController,
 } from '../controllers/auth.js'; // Контроллеры
 
 
@@ -40,4 +44,18 @@ router.post(
 // Маршрут для логаута пользователя
 router.post('/logout', ctrlWrapper(logoutUserController)); // Добавляем контроллер для логаута
 
+router.post(
+  '/send-reset-email',
+  validateBody(requestResetEmailSchema),
+  ctrlWrapper(requestResetEmailController),
+);
+
+router.post(
+  '/reset-pwd',
+  validateBody(resetPasswordSchema),
+  ctrlWrapper(resetPasswordController),
+);
+
 export default router;
+//Роут для запиту на скидання паролю
+
