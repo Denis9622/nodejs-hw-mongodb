@@ -6,10 +6,10 @@ import jwt from 'jsonwebtoken'; // Для работы с JWT токенами
 import { requestResetToken, resetPassword } from '../services/auth.js';
 
 
-// Секреты и настройки для токенов (обычно их хранят в переменных окружения)
+// Секреты и настройки для токенов (их следует хранить в переменных окружения)
 const JWT_SECRET = process.env.JWT_SECRET || 'secretKey'; // Секрет для JWT токенов
-const JWT_EXPIRES_IN = '1h'; // Время жизни access токена
-const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Время жизни refresh токена
+const JWT_EXPIRES_IN = '15m'; // Время жизни access токена — 15 минут
+const REFRESH_TOKEN_EXPIRES_IN = '30d'; // Время жизни refresh токена — 30 дней
 
 // Контроллер для создания нового пользователя (регистрация)
 export async function createUserController(req, res, next) {
@@ -71,16 +71,16 @@ export async function loginUserController(req, res, next) {
 
     // Создаем access и refresh токены с использованием JWT
     const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn: JWT_EXPIRES_IN, // 15 минут
     });
     const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN, // 30 дней
     });
 
-    const accessTokenValidUntil = new Date(Date.now() + 60 * 60 * 1000); // Токен на 1 час
+    const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Токен на 15 минут
     const refreshTokenValidUntil = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
-    ); // Токен на 7 дней
+      Date.now() + 30 * 24 * 60 * 60 * 1000,
+    ); // Токен на 30 дней
 
     // Создаем новую сессию и сохраняем её в базе данных
     await Session.create({
@@ -91,11 +91,11 @@ export async function loginUserController(req, res, next) {
       refreshTokenValidUntil,
     });
 
-    // Устанавливаем refresh токен в cookies (например, на 7 дней)
+    // Устанавливаем refresh токен в cookies (например, на 30 дней)
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true, // Ограничиваем доступ к cookie только через HTTP (защита от XSS)
       secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
     });
 
     // Возвращаем успешный ответ с access токеном
@@ -134,16 +134,16 @@ export async function refreshSessionController(req, res, next) {
 
     // Генерируем новый access токен
     const accessToken = jwt.sign({ userId: session.userId }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn: JWT_EXPIRES_IN, // 15 минут
     });
     const newRefreshToken = jwt.sign({ userId: session.userId }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN, // 30 дней
     });
 
-    const accessTokenValidUntil = new Date(Date.now() + 60 * 60 * 1000); // Новый access токен на 1 час
+    const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Новый access токен на 15 минут
     const refreshTokenValidUntil = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
-    ); // Новый refresh токен на 7 дней
+      Date.now() + 30 * 24 * 60 * 60 * 1000,
+    ); // Новый refresh токен на 30 дней
 
     // Обновляем сессию в базе данных
     session.accessToken = accessToken;
@@ -156,7 +156,7 @@ export async function refreshSessionController(req, res, next) {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
     });
 
     // Возвращаем новый access токен
