@@ -1,20 +1,27 @@
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Получаем текущий путь (__dirname не доступен в ES Modules)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Загружаем переменные окружения из .env файла
-dotenv.config({ path: path.resolve(__dirname, './../.env') });
+dotenv.config();
 
-// Теперь переменные окружения автоматически загружены в process.env
-// Вы можете получить доступ к переменным через process.env, например:
-// const dbUser = process.env.MONGODB_USER;
-// const dbPassword = process.env.MONGODB_PASSWORD;
+export function env(name, defaultValue = undefined) {
+  // Получаем значение переменной окружения
+  const value = process.env[name];
 
-export function parseEnv() {
-  // Если нужно, вы можете обрабатывать process.env далее или просто возвращать его
-  return process.env;
+  // Если переменная найдена, возвращаем её
+  if (value) {
+    return value;
+  }
+
+  // Если переменная не найдена, но есть значение по умолчанию, возвращаем его
+  if (defaultValue !== undefined) {
+    return defaultValue;
+  }
+
+  // Логируем ошибку для отладки
+  console.error(
+    `Ошибка: переменная окружения '${name}' не найдена и не задано значение по умолчанию.`,
+  );
+
+  // Выбрасываем ошибку, если переменная отсутствует
+  throw new Error(`Missing: process.env['${name}'].`);
 }

@@ -200,35 +200,36 @@ export async function logoutUserController(req, res, next) {
     next(error); // Передаем ошибку в следующий middleware для обработки
   }
 }
-
-// Контроллер для отправки email с токеном для сброса пароля
+//Контролер для запиту на скидання паролю
 export const requestResetEmailController = async (req, res, next) => {
   try {
-    await requestResetToken(req.body.email);
-    res.json({
+    const { email } = req.body;
+    await requestResetToken(email);
+
+    res.status(200).json({
       status: 200,
-      message: 'Reset password email was successfully sent!',
+      message: 'Reset password email has been successfully sent.',
       data: {},
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 };
 
-// Контроллер для сброса пароля
+
+//Контролер для оновлення паролю
+
 export const resetPasswordController = async (req, res, next) => {
   try {
-    await resetPassword(req.body);
-    res.json({
-      message: 'Password was successfully reset!',
+    const { token, password } = req.body;
+    await resetPassword(token, password);
+
+    res.status(200).json({
       status: 200,
+      message: 'Password has been successfully reset.',
       data: {},
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 };
-
-
-
-

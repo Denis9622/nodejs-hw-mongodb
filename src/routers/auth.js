@@ -41,12 +41,14 @@ router.post(
 // Маршрут для логаута пользователя
 router.post('/logout', ctrlWrapper(logoutUserController)); // Добавляем контроллер для логаута
 
+
 // Добавляем маршрут для отправки email сброса пароля
 router.post(
   '/send-reset-email',
   validateBody(requestResetEmailSchema),
   ctrlWrapper(requestResetEmailController),
 );
+
 
 // Добавляем маршрут для сброса пароля
 router.post(
@@ -56,3 +58,5 @@ router.post(
 );
 
 export default router;
+//Роут для запиту на скидання паролю
+
