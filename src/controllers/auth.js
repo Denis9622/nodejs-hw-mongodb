@@ -198,7 +198,11 @@ export const requestResetEmailController = async (req, res, next) => {
 
 export const resetPasswordController = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body; // Здесь важно, чтобы поле называлось "newPassword"
+    const { token, newPassword } = req.body;
+
+    // Логирование данных
+    console.log('Token:', token);
+    console.log('New password:', newPassword);
 
     // Верификация токена
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -211,6 +215,7 @@ export const resetPasswordController = async (req, res, next) => {
 
     // Хешируем новый пароль перед сохранением
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    console.log('Hashed password:', hashedPassword);
 
     // Обновляем пароль пользователя
     user.password = hashedPassword;
@@ -224,3 +229,4 @@ export const resetPasswordController = async (req, res, next) => {
     next(error);
   }
 };
+

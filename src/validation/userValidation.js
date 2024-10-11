@@ -21,8 +21,8 @@ export const requestResetEmailSchema = Joi.object({
   email: Joi.string().email().required(),
 });
 
-// Схема для сброса пароля
+// Схема валидации для сброса пароля
 export const resetPasswordSchema = Joi.object({
-  token: Joi.string().required(),
-  password: Joi.string().min(6).required(),
+  token: Joi.string().required(), // Токен обязательно должен быть строкой
+  password: Joi.string().min(6).required() // Пароль должен быть строкой и иметь минимальную длину 6 символов
 });

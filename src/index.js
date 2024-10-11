@@ -1,16 +1,14 @@
-import dotenv from 'dotenv'; // Підключаємо dotenv для автоматичного завантаження змінних з .env
+import dotenv from 'dotenv';
 import { setupServer } from './server.js';
 import { initMongoConnection } from './db/initMongoConnection.js';
-import './models/contact.js'; // Імпорт моделі для ініціалізації
+import './models/contact.js';
 
-// Завантажуємо змінні середовища з .env файлу
-dotenv.config(); 
+dotenv.config();
 
-// Ініціалізуємо підключення до MongoDB і сервер
 (async () => {
   try {
-    await initMongoConnection(); // Підключаємося до MongoDB
-    setupServer(); // Запускаємо сервер після підключення
+    await initMongoConnection(); // Подключение к MongoDB
+    setupServer(); // Запуск сервера после подключения
   } catch (error) {
     console.error('Error during server initialization:', error);
   }

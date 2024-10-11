@@ -8,34 +8,85 @@ import Session from '../models/session.js'; // Импорт модели сес�
 import { SMTP, TEMPLATES_DIR } from '../constants/contacts-constants.js';
 import path from 'node:path';
 import handlebars from 'handlebars';
-
 import fs from 'node:fs/promises';
-
 import { sendEMail } from '../utils/sendMail.js'; // Оновлений шлях до файлу sendMail
 import { env } from './../env.js';
-
 
 
 // Сервис для регистрации пользователя
 export async function registerUser({ name, email, password }) {
   // Проверка, существует ли пользователь с таким email
   const existingUser = await User.findOne({ email });
+
   if (existingUser) {
-    throw createHttpError(409, 'Email in use'); // Если email уже существует, возвращаем ошибку 409
+    throw createHttpError(409, 'Email is already in use'); // Ошибка 409, если email уже зарегистрирован
   }
 
-  // Хеширование пароля перед сохранением
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // Проверяем, что передан пароль и он не пустой
+  if (!password || password.trim() === '') {
+    throw createHttpError(400, 'Password is required'); // Ошибка 400, если пароль отсутствует
+  }
 
-  // Создание нового пользователя
-  const newUser = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-  });
+  // Логируем перед хешированием, чтобы убедиться, что пароль передается корректно
+  console.log('Password before hashing:', password);
 
-  return newUser; // Возвращаем созданного пользователя
+  // Указываем количество раундов соли для bcrypt
+  const saltRounds = 10;
+
+  try {
+    // Хеширование пароля перед сохранением
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Создание нового пользователя
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword, // Сохраняем хешированный пароль
+    });
+
+    // Логируем успешное создание пользователя
+    console.log('New user created:', newUser);
+
+    // Генерация access и refresh токенов для нового пользователя
+    const accessToken = jwt.sign(
+      { userId: newUser._id },
+      env('ACCESS_TOKEN_SECRET'),
+      { expiresIn: '15m' } // Токен действует 15 минут
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: newUser._id },
+      env('REFRESH_TOKEN_SECRET'),
+      { expiresIn: '30d' } // Refresh токен действует 30 дней
+    );
+
+    // Создание сессии для нового пользователя
+    await Session.create({
+      userId: newUser._id,
+      accessToken,
+      refreshToken,
+      accessTokenValidUntil: new Date(Date.now() + 15 * 60 * 1000), // 15 минут
+      refreshTokenValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 дней
+    });
+
+    // Возвращаем токены и информацию о созданном пользователе
+    return {
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role, // Если у пользователя есть роль
+      },
+      accessToken,
+      refreshToken,
+    };
+  } catch (error) {
+    console.error('Error hashing password:', error); // Логируем ошибку
+    throw createHttpError(500, 'Error creating user'); // Генерируем 500 ошибку
+  }
 }
+
+
 
 // Сервис для логина пользователя
 export async function loginUser({ email, password }) {
@@ -54,13 +105,13 @@ export async function loginUser({ email, password }) {
   // Генерируем access и refresh токены
   const accessToken = jwt.sign(
     { userId: user._id },
-    process.env.ACCESS_TOKEN_SECRET,
+    env('ACCESS_TOKEN_SECRET'), // Используем env для секретного ключа
     { expiresIn: '15m' }, // Время жизни access токена — 15 минут
   );
 
   const refreshToken = jwt.sign(
     { userId: user._id },
-    process.env.REFRESH_TOKEN_SECRET,
+    env('REFRESH_TOKEN_SECRET'), // Используем env для секретного ключа
     { expiresIn: '30d' }, // Время жизни refresh токена — 30 дней
   );
 
@@ -83,7 +134,7 @@ export async function loginUser({ email, password }) {
 export async function refreshSession(refreshToken) {
   try {
     // Проверяем валидность refresh токена
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const decoded = jwt.verify(refreshToken, env('REFRESH_TOKEN_SECRET'));
 
     // Ищем пользователя по ID
     const user = await User.findById(decoded.userId);
@@ -116,14 +167,14 @@ export async function refreshSession(refreshToken) {
 
 // Вспомогательная функция для генерации access токена
 function generateAccessToken(userId) {
-  return jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
+  return jwt.sign({ userId }, env('ACCESS_TOKEN_SECRET'), {
     expiresIn: '15m', // Время жизни access токена — 15 минут
   });
 }
 
 // Вспомогательная функция для генерации refresh токена
 function generateRefreshToken(userId) {
-  return jwt.sign({ userId }, process.env.REFRESH_TOKEN_SECRET, {
+  return jwt.sign({ userId }, env('REFRESH_TOKEN_SECRET'), {
     expiresIn: '30d', // Время жизни refresh токена — 30 дней
   });
 }
@@ -132,7 +183,7 @@ function generateRefreshToken(userId) {
 export async function logoutUser(refreshToken) {
   try {
     // Проверяем валидность refresh токена
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const decoded = jwt.verify(refreshToken, env('REFRESH_TOKEN_SECRET'));
 
     // Удаляем сессию на основе userId и refreshToken
     const session = await Session.findOneAndDelete({
@@ -148,38 +199,42 @@ export async function logoutUser(refreshToken) {
     throw createHttpError(401, 'Invalid token or session'); // Ошибка 401 при неверном токене или отсутствии сессии
   }
 }
+
+// Сервис для запроса токена сброса пароля
 export const requestResetToken = async (email) => {
+  // Найти пользователя по email
   const user = await User.findOne({ email });
   if (!user) {
-    throw createHttpError(404, 'User not found');
+    throw createHttpError(404, 'User not found'); // Ошибка, если пользователь не найден
   }
 
+  // Генерация JWT токена с ограниченным сроком действия
   const resetToken = jwt.sign(
-    {
-      sub: user._id, // Здесь должен быть user._id
-      email: user.email,
-    },
-    env('JWT_SECRET'),
-    {
-      expiresIn: '15m',
-    },
+    { userId: user._id, email: user.email }, // Информация, которая будет закодирована в токене
+    env('JWT_SECRET'), // Секрет для подписи токена
+    { expiresIn: '15m' }, // Токен действует 15 минут
   );
 
+  // Путь к шаблону email для сброса пароля
   const resetPasswordTemplatePath = path.join(
     TEMPLATES_DIR,
     'reset-password-email.html',
   );
 
-  const templateSource = (
-    await fs.readFile(resetPasswordTemplatePath)
-  ).toString();
+  // Чтение шаблона email
+  const templateSource = await fs.readFile(resetPasswordTemplatePath, 'utf8');
+  const template = handlebars.compile(templateSource); // Компиляция шаблона
 
-  const template = handlebars.compile(templateSource);
+  // Ссылка для сброса пароля
+  const resetLink = `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`;
+
+  // Рендеринг шаблона с данными пользователя
   const html = template({
     name: user.name,
-    link: `${env('APP_DOMAIN')}/reset-password?token=${resetToken}`,
+    link: resetLink,
   });
 
+  // Отправка email с токеном сброса
   await sendEMail({
     from: env(SMTP.SMTP_FROM),
     to: email,
@@ -187,22 +242,30 @@ export const requestResetToken = async (email) => {
     html,
   });
 };
-// Роут для оновлення паролю
-// Функция для сброса пароля
+
+// Сервис для сброса пароля
 export const resetPassword = async (token, newPassword) => {
   try {
     // Верификация токена и получение данных
     const decoded = jwt.verify(token, env('JWT_SECRET'));
 
-    // Поиск пользователя по ID или email, извлеченному из токена
-    const user = await User.findById(decoded.sub); // Используем userId (sub) из токена
+    // Поиск пользователя по ID, извлеченному из токена
+    const user = await User.findById(decoded.userId); // Используем userId (sub) из токена
 
     if (!user) {
       throw createHttpError(404, 'User not found!');
     }
 
+    // Проверяем, что новый пароль передан и не пустой
+    if (!newPassword || newPassword.trim() === '') {
+      throw createHttpError(400, 'Password is required');
+    }
+
+    // Указываем количество раундов соли для bcrypt
+    const saltRounds = 10; // Стандартное количество раундов соли
+
     // Хешируем новый пароль перед сохранением
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Обновляем пароль пользователя
     user.password = hashedPassword;
@@ -219,6 +282,7 @@ export const resetPassword = async (token, newPassword) => {
     ) {
       throw createHttpError(401, 'Token is expired or invalid.');
     }
+    console.error('Error in resetPassword:', error);
     throw error;
   }
 };
