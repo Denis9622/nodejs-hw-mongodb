@@ -3,7 +3,7 @@ import Session from '../models/session.js'; // Импортируем модел
 import createHttpError from 'http-errors'; // Для создания HTTP ошибок
 import bcrypt from 'bcrypt'; // Для хеширования паролей
 import jwt from 'jsonwebtoken'; // Для работы с JWT токенами
-import { requestResetToken, resetPassword } from '../services/auth.js';
+import { requestResetToken } from '../services/auth.js';
 
 
 // Секреты и настройки для токенов (их следует хранить в переменных окружения)
@@ -54,63 +54,42 @@ export async function loginUserController(req, res, next) {
 
     // Проверяем, переданы ли email и пароль
     if (!email || !password) {
-      throw createHttpError(400, 'Email и пароль обязательны'); // Ошибка 400, если данные неполные
+      throw createHttpError(400, 'Email и пароль обязательны');
     }
 
     // Ищем пользователя по email
     const user = await User.findOne({ email });
     if (!user) {
-      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пользователь не найден
+      throw createHttpError(401, 'Неправильный email или пароль');
     }
 
-    // Проверяем пароль
+    // Проверяем пароль с помощью bcrypt.compare
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пароль неверный
+      throw createHttpError(401, 'Неправильный email или пароль');
     }
 
-    // Создаем access и refresh токены с использованием JWT
-    const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN, // 15 минут
+    // Генерация access и refresh токенов
+    const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     });
-    const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN, // 30 дней
-    });
-
-    const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Токен на 15 минут
-    const refreshTokenValidUntil = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000,
-    ); // Токен на 30 дней
-
-    // Создаем новую сессию и сохраняем её в базе данных
-    await Session.create({
-      userId: user._id,
-      accessToken,
-      refreshToken,
-      accessTokenValidUntil,
-      refreshTokenValidUntil,
+    const refreshToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
     });
 
-    // Устанавливаем refresh токен в cookies (например, на 30 дней)
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true, // Ограничиваем доступ к cookie только через HTTP (защита от XSS)
-      secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
-    });
-
-    // Возвращаем успешный ответ с access токеном
+    // Возвращаем успешный ответ с токенами
     res.status(200).json({
       status: 200,
       message: 'Пользователь успешно авторизован!',
       data: {
         accessToken,
+        refreshToken,
       },
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 }
-
 // Контроллер для обновления сессии (по refresh токену)
 export async function refreshSessionController(req, res, next) {
   try {
@@ -217,17 +196,29 @@ export const requestResetEmailController = async (req, res, next) => {
 };
 
 
-//Контролер для оновлення паролю
-
 export const resetPasswordController = async (req, res, next) => {
   try {
-    const { token, password } = req.body;
-    await resetPassword(token, password);
+    const { token, newPassword } = req.body; // Здесь важно, чтобы поле называлось "newPassword"
+
+    // Верификация токена
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Поиск пользователя по ID
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      throw createHttpError(404, 'User not found');
+    }
+
+    // Хешируем новый пароль перед сохранением
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Обновляем пароль пользователя
+    user.password = hashedPassword;
+    await user.save();
 
     res.status(200).json({
       status: 200,
       message: 'Password has been successfully reset.',
-      data: {},
     });
   } catch (error) {
     next(error);

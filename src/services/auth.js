@@ -12,8 +12,8 @@ import handlebars from 'handlebars';
 import fs from 'node:fs/promises';
 
 import { sendEMail } from '../utils/sendMail.js'; // Оновлений шлях до файлу sendMail
-import UsersCollection from '../models/user.js';
 import { env } from './../env.js';
+
 
 
 // Сервис для регистрации пользователя
@@ -149,15 +149,15 @@ export async function logoutUser(refreshToken) {
   }
 }
 export const requestResetToken = async (email) => {
-  const user = await UsersCollection.findOne({ email });
+  const user = await User.findOne({ email });
   if (!user) {
     throw createHttpError(404, 'User not found');
   }
 
   const resetToken = jwt.sign(
     {
-      sub: user._id,
-      email,
+      sub: user._id, // Здесь должен быть user._id
+      email: user.email,
     },
     env('JWT_SECRET'),
     {
@@ -187,21 +187,28 @@ export const requestResetToken = async (email) => {
     html,
   });
 };
-//Роут для оновлення паролю
+// Роут для оновлення паролю
+// Функция для сброса пароля
 export const resetPassword = async (token, newPassword) => {
   try {
+    // Верификация токена и получение данных
     const decoded = jwt.verify(token, env('JWT_SECRET'));
-    const user = await UsersCollection.findOne({ email: decoded.email });
+
+    // Поиск пользователя по ID или email, извлеченному из токена
+    const user = await User.findById(decoded.sub); // Используем userId (sub) из токена
 
     if (!user) {
       throw createHttpError(404, 'User not found!');
     }
 
-    // Оновлення паролю
-    user.password = newPassword;
+    // Хешируем новый пароль перед сохранением
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Обновляем пароль пользователя
+    user.password = hashedPassword;
     await user.save();
 
-    // Видалення сесій користувача
+    // Удаляем все активные сессии пользователя
     await Session.deleteMany({ userId: user._id });
 
     return user;
@@ -215,4 +222,3 @@ export const resetPassword = async (token, newPassword) => {
     throw error;
   }
 };
-
