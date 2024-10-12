@@ -3,7 +3,7 @@ import Session from '../models/session.js'; // Импортируем модел
 import createHttpError from 'http-errors'; // Для создания HTTP ошибок
 import bcrypt from 'bcrypt'; // Для хеширования паролей
 import jwt from 'jsonwebtoken'; // Для работы с JWT токенами
-import { requestResetToken, resetPassword } from '../services/auth.js';
+import { requestResetToken } from '../services/auth.js';
 
 
 // Секреты и настройки для токенов (их следует хранить в переменных окружения)
@@ -11,7 +11,60 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secretKey'; // Секрет для
 const JWT_EXPIRES_IN = '15m'; // Время жизни access токена — 15 минут
 const REFRESH_TOKEN_EXPIRES_IN = '30d'; // Время жизни refresh токена — 30 дней
 
-// Контроллер для создания нового пользователя (регистрация)
+
+// export const createUserController = async (req, res, next) => {
+//   try {
+//     // Получаем загруженный файл (если он есть)
+//     const photo = req.file;
+//     console.log('Uploaded file:', req.file);
+//     let photoUrl;
+
+//     // Если файл фото передан, сохраняем его
+//     if (photo) {
+//       if (env('ENABLE_CLOUDINARY') === 'true') {
+//         // Сохраняем фото в Cloudinary и получаем URL
+//         photoUrl = await saveFileToCloudinary(photo);
+//       } else {
+//         // Сохраняем фото локально и получаем путь
+//         photoUrl = await saveFileToUploadDir(photo);
+//       }
+//     }
+
+//     const { name, email, password } = req.body;
+
+//     // Проверяем, существует ли пользователь с таким email
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       throw createHttpError(409, 'Email in use'); // Ошибка 409, если email уже используется
+//     }
+
+//     // Хешируем пароль перед сохранением
+//     const hashedPassword = await bcrypt.hash(password, 10); // Хеширование пароля
+
+//     // Создаем нового пользователя
+//     const newUser = await User.create({
+//       name,
+//       email,
+//       password: hashedPassword,
+//       photo: photoUrl, // Сохраняем URL фотографии
+//     });
+
+//     // Возвращаем успешный ответ с информацией о пользователе (без пароля)
+//     res.status(201).json({
+//       status: 201,
+//       message: 'User successfully registered!',
+//       data: {
+//         id: newUser._id,
+//         name: newUser.name,
+//         email: newUser.email,
+//         photo: newUser.photo, // Возвращаем URL фотографии
+//       },
+//     });
+//   } catch (error) {
+//     next(error); // Передаем ошибку в middleware для обработки
+//   }
+// };
+//Контроллер для создания нового пользователя (регистрация)
 export async function createUserController(req, res, next) {
   try {
     const { name, email, password } = req.body;
@@ -54,63 +107,42 @@ export async function loginUserController(req, res, next) {
 
     // Проверяем, переданы ли email и пароль
     if (!email || !password) {
-      throw createHttpError(400, 'Email и пароль обязательны'); // Ошибка 400, если данные неполные
+      throw createHttpError(400, 'Email и пароль обязательны');
     }
 
     // Ищем пользователя по email
     const user = await User.findOne({ email });
     if (!user) {
-      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пользователь не найден
+      throw createHttpError(401, 'Неправильный email или пароль');
     }
 
-    // Проверяем пароль
+    // Проверяем пароль с помощью bcrypt.compare
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пароль неверный
+      throw createHttpError(401, 'Неправильный email или пароль');
     }
 
-    // Создаем access и refresh токены с использованием JWT
-    const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN, // 15 минут
+    // Генерация access и refresh токенов
+    const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     });
-    const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN, // 30 дней
-    });
-
-    const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Токен на 15 минут
-    const refreshTokenValidUntil = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000,
-    ); // Токен на 30 дней
-
-    // Создаем новую сессию и сохраняем её в базе данных
-    await Session.create({
-      userId: user._id,
-      accessToken,
-      refreshToken,
-      accessTokenValidUntil,
-      refreshTokenValidUntil,
+    const refreshToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
     });
 
-    // Устанавливаем refresh токен в cookies (например, на 30 дней)
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true, // Ограничиваем доступ к cookie только через HTTP (защита от XSS)
-      secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
-    });
-
-    // Возвращаем успешный ответ с access токеном
+    // Возвращаем успешный ответ с токенами
     res.status(200).json({
       status: 200,
       message: 'Пользователь успешно авторизован!',
       data: {
         accessToken,
+        refreshToken,
       },
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 }
-
 // Контроллер для обновления сессии (по refresh токену)
 export async function refreshSessionController(req, res, next) {
   try {
@@ -200,35 +232,51 @@ export async function logoutUserController(req, res, next) {
     next(error); // Передаем ошибку в следующий middleware для обработки
   }
 }
-
-// Контроллер для отправки email с токеном для сброса пароля
+//Контролер для запиту на скидання паролю
 export const requestResetEmailController = async (req, res, next) => {
   try {
-    await requestResetToken(req.body.email);
-    res.json({
+    const { email } = req.body;
+    await requestResetToken(email);
+
+    res.status(200).json({
       status: 200,
-      message: 'Reset password email was successfully sent!',
+      message: 'Reset password email has been successfully sent.',
       data: {},
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 };
 
-// Контроллер для сброса пароля
+
 export const resetPasswordController = async (req, res, next) => {
   try {
-    await resetPassword(req.body);
-    res.json({
-      message: 'Password was successfully reset!',
+    const { token, password } = req.body;
+
+    // Верификация токена
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Поиск пользователя по ID
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      throw createHttpError(404, 'User not found');
+    }
+
+    // Хеширование нового пароля
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Обновление пароля
+    user.password = hashedPassword;
+    await user.save();
+
+    // Удаление активных сессий пользователя
+    await Session.deleteMany({ userId: user._id });
+
+    res.status(200).json({
       status: 200,
-      data: {},
+      message: 'Password has been successfully reset.',
     });
   } catch (error) {
-    next(error); // Передаем ошибку в следующий middleware для обработки
+    next(error);
   }
 };
-
-
-
-

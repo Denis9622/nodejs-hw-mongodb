@@ -6,6 +6,9 @@ import authRouter from './routers/auth.js'; // Импорт маршрутов �
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import cookieParser from 'cookie-parser';
+import { UPLOAD_DIR } from './constants/contacts-constants.js';
+
+
 
 
 export function setupServer() {
@@ -28,6 +31,9 @@ export function setupServer() {
 
   // Middleware для обработки ошибок
   app.use(errorHandler);
+
+   app.use('/uploads', express.static(UPLOAD_DIR));
+
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {

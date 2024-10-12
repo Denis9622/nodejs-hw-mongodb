@@ -1,19 +1,26 @@
-import { parseEnv } from './env.js'; // Імпортуємо утиліту для парсингу
+import dotenv from 'dotenv';
 import { setupServer } from './server.js';
 import { initMongoConnection } from './db/initMongoConnection.js';
-import './models/contact.js'; // Імпорт моделі для ініціалізації
+import './models/contact.js';
+import { createDirIfNotExists } from './utils/createDirIfNotExists.js';
+import { TEMP_UPLOAD_DIR, UPLOAD_DIR } from './constants/contacts-constants.js';
 
+dotenv.config();
 
-// Парсимо змінні оточення з файлу .env
-const envVars = parseEnv();
-process.env = { ...process.env, ...envVars }; // Зберігаємо змінні в process.env
+// (async () => {
+//   try {
+//     await initMongoConnection(); // Подключение к MongoDB
+//     setupServer(); // Запуск сервера после подключения
+//   } catch (error) {
+//     console.error('Error during server initialization:', error);
+//   }
+// })();
 
-// Ініціалізуємо підключення до MongoDB і сервер
-(async () => {
-  try {
-    await initMongoConnection(); // Підключаємося до MongoDB
-    setupServer(); // Запускаємо сервер після підключення
-  } catch (error) {
-    console.error('Error during server initialization:', error);
-  }
-})();
+const bootstrap = async () => {
+  await initMongoConnection();
+  await createDirIfNotExists(TEMP_UPLOAD_DIR);
+  await createDirIfNotExists(UPLOAD_DIR);
+  setupServer();
+};
+
+void bootstrap();

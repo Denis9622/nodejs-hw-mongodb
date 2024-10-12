@@ -1,49 +1,56 @@
-import createHttpError from 'http-errors'; // Для роботи з HTTP-помилками
-import Contact from '../models/contact.js'; // Імпорт моделі Contact
+import mongoose from 'mongoose';
+import createHttpError from 'http-errors';
+import Contact from '../models/contact.js';
 
-// Сервіс для отримання контактів з пагінацією, сортуванням і фільтрацією
 export async function getAllContactsWithPagination(
   page,
   perPage,
   sortBy,
   sortOrder,
-  filter, // Додаємо фільтр
+  filter,
 ) {
   try {
     const skip = (page - 1) * perPage;
     const sortCriteria = { [sortBy]: sortOrder };
 
-    // Використовуємо фільтр у запиті до бази даних
     const [contacts, totalItems] = await Promise.all([
       Contact.find(filter).skip(skip).limit(perPage).sort(sortCriteria),
-      Contact.countDocuments(filter), // Підраховуємо кількість документів з фільтром
+      Contact.countDocuments(filter),
     ]);
 
     return { contacts, totalItems };
-  } catch (error) {
-    console.error('Error fetching contacts with filter:', error);
+  } catch {
     throw createHttpError(500, 'Failed to retrieve contacts');
   }
 }
 
-// Сервіс для створення нового контакту
 export async function createContact(contactData) {
   try {
     const newContact = await Contact.create(contactData);
     return newContact;
-  } catch (error) {
-    console.error('Error creating contact:', error);
+  } catch {
     throw createHttpError(400, 'Failed to create contact');
   }
 }
 
-// Сервіс для оновлення контакту за ID та userId
 export async function updateContactById(contactId, userId, updateData) {
   try {
+    // Проверяем валидность ID в сервисе
+    if (
+      !mongoose.Types.ObjectId.isValid(contactId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw createHttpError(400, 'Invalid contact ID or user ID format');
+    }
+
+    // Логирование для отладки
+    console.log('Filter:', { _id: contactId, userId });
+    console.log('Update data:', updateData);
+
     const updatedContact = await Contact.findOneAndUpdate(
-      { _id: contactId, userId }, // Пошук за ID і userId
+      { _id: contactId, userId }, // Фильтруем по ID контакта и пользователя
       updateData,
-      { new: true, runValidators: true }, // Повертаємо оновлений контакт і застосовуємо валідацію
+      { new: true, runValidators: true }, // Обновляем и проверяем валидацию
     );
 
     if (!updatedContact) {
@@ -52,17 +59,16 @@ export async function updateContactById(contactId, userId, updateData) {
 
     return updatedContact;
   } catch (error) {
-    console.error(`Error updating contact with id ${contactId}:`, error);
+    console.error('Error updating contact:', error);
     throw createHttpError(500, 'Failed to update contact');
   }
 }
 
-// Сервіс для видалення контакту за ID та userId
 export async function deleteContactById(contactId, userId) {
   try {
     const deletedContact = await Contact.findOneAndDelete({
       _id: contactId,
-      userId, // Перевіряємо, що контакт належить поточному користувачу
+      userId,
     });
 
     if (!deletedContact) {
@@ -70,22 +76,19 @@ export async function deleteContactById(contactId, userId) {
     }
 
     return deletedContact;
-  } catch (error) {
-    console.error(`Error deleting contact with id ${contactId}:`, error);
+  } catch  {
     throw createHttpError(500, 'Failed to delete contact');
   }
 }
 
-// Сервіс для отримання контакту за ID та userId
 export async function getContactById(contactId, userId) {
   try {
-    const contact = await Contact.findOne({ _id: contactId, userId }); // Пошук за ID і userId
+    const contact = await Contact.findOne({ _id: contactId, userId });
     if (!contact) {
       throw createHttpError(404, 'Contact not found');
     }
     return contact;
-  } catch (error) {
-    console.error(`Error fetching contact with id ${contactId}:`, error);
+  } catch  {
     throw createHttpError(500, 'Failed to retrieve contact');
   }
 }
