@@ -11,6 +11,20 @@ const PATH_DB = path.join(__dirname, '../db/db.json');
 // Экспортируем путь
 export { PATH_DB };
 
+  export const contactTypeList = ['work', 'home', 'personal'];
+  export const SORT_ORDER = {
+    ASC: 'asc',
+    DESC: 'desc',
+  };
+
+  export const FIFTEEN_MINUTES = 15 * 60 * 1000;
+  export const ONE_DAY = 24 * 60 * 60 * 1000;
+
+  export const ROLES = {
+    TEACHER: 'teacher',
+    PARENT: 'parent',
+  };
+
 export const SMTP = {
   SMTP_HOST: 'SMTP_HOST',
   SMTP_PORT: 'SMTP_PORT',

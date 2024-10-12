@@ -11,7 +11,60 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secretKey'; // Секрет для
 const JWT_EXPIRES_IN = '15m'; // Время жизни access токена — 15 минут
 const REFRESH_TOKEN_EXPIRES_IN = '30d'; // Время жизни refresh токена — 30 дней
 
-// Контроллер для создания нового пользователя (регистрация)
+
+// export const createUserController = async (req, res, next) => {
+//   try {
+//     // Получаем загруженный файл (если он есть)
+//     const photo = req.file;
+//     console.log('Uploaded file:', req.file);
+//     let photoUrl;
+
+//     // Если файл фото передан, сохраняем его
+//     if (photo) {
+//       if (env('ENABLE_CLOUDINARY') === 'true') {
+//         // Сохраняем фото в Cloudinary и получаем URL
+//         photoUrl = await saveFileToCloudinary(photo);
+//       } else {
+//         // Сохраняем фото локально и получаем путь
+//         photoUrl = await saveFileToUploadDir(photo);
+//       }
+//     }
+
+//     const { name, email, password } = req.body;
+
+//     // Проверяем, существует ли пользователь с таким email
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       throw createHttpError(409, 'Email in use'); // Ошибка 409, если email уже используется
+//     }
+
+//     // Хешируем пароль перед сохранением
+//     const hashedPassword = await bcrypt.hash(password, 10); // Хеширование пароля
+
+//     // Создаем нового пользователя
+//     const newUser = await User.create({
+//       name,
+//       email,
+//       password: hashedPassword,
+//       photo: photoUrl, // Сохраняем URL фотографии
+//     });
+
+//     // Возвращаем успешный ответ с информацией о пользователе (без пароля)
+//     res.status(201).json({
+//       status: 201,
+//       message: 'User successfully registered!',
+//       data: {
+//         id: newUser._id,
+//         name: newUser.name,
+//         email: newUser.email,
+//         photo: newUser.photo, // Возвращаем URL фотографии
+//       },
+//     });
+//   } catch (error) {
+//     next(error); // Передаем ошибку в middleware для обработки
+//   }
+// };
+//Контроллер для создания нового пользователя (регистрация)
 export async function createUserController(req, res, next) {
   try {
     const { name, email, password } = req.body;
@@ -198,11 +251,7 @@ export const requestResetEmailController = async (req, res, next) => {
 
 export const resetPasswordController = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-
-    // Логирование данных
-    console.log('Token:', token);
-    console.log('New password:', newPassword);
+    const { token, password } = req.body;
 
     // Верификация токена
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -213,13 +262,15 @@ export const resetPasswordController = async (req, res, next) => {
       throw createHttpError(404, 'User not found');
     }
 
-    // Хешируем новый пароль перед сохранением
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    console.log('Hashed password:', hashedPassword);
+    // Хеширование нового пароля
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Обновляем пароль пользователя
+    // Обновление пароля
     user.password = hashedPassword;
     await user.save();
+
+    // Удаление активных сессий пользователя
+    await Session.deleteMany({ userId: user._id });
 
     res.status(200).json({
       status: 200,
@@ -229,4 +280,3 @@ export const resetPasswordController = async (req, res, next) => {
     next(error);
   }
 };
-

@@ -1,18 +1,20 @@
-import mongoose from 'mongoose';
+import { model, Schema } from 'mongoose';
+import { contactTypeList } from './../constants/contacts-constants.js';
+import { mongooseSaveError, setUpdateSettings } from './hooks.js';
 
-const contactSchema = new mongoose.Schema(
+const contactSchema = new Schema(
   {
     name: {
       type: String,
-      required: [true, 'Name is required'],
+      required: true,
     },
     phoneNumber: {
       type: String,
-      required: [true, 'Phone number is required'],
+      required: true,
     },
     email: {
       type: String,
-      default: '',
+      required: false,
     },
     isFavourite: {
       type: Boolean,
@@ -20,21 +22,33 @@ const contactSchema = new mongoose.Schema(
     },
     contactType: {
       type: String,
-      enum: ['work', 'home', 'personal'],
-      required: [true, 'Contact type is required'],
+      enum: contactTypeList,
+      required: true,
       default: 'personal',
     },
+    // Связываем контакт с пользователем через ObjectId
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', // Связываем с коллекцией User
-      required: true, // Поле userId обязательно
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: 'users',
+    },
+    photo: {
+      type: String,
+      default: null, // По умолчанию без фото
     },
   },
   {
-    timestamps: true, // Додає createdAt та updatedAt автоматично
+    timestamps: true, // Добавляет createdAt и updatedAt
+    versionKey: false, // Отключаем поле __v
   },
 );
 
-const Contact = mongoose.model('Contact', contactSchema);
+// Хук для обработки ошибок сохранения
+contactSchema.post('save', mongooseSaveError);
 
+// Настройки для обновления, чтобы корректно обрабатывать поля
+contactSchema.pre('findOneAndUpdate', setUpdateSettings);
+contactSchema.post('findOneAndUpdate', mongooseSaveError);
+
+const Contact = model('contacts', contactSchema);
 export default Contact;

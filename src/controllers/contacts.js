@@ -6,6 +6,11 @@ import {
   updateContactById,
   deleteContactById,
 } from '../services/contacts.js';
+import { env } from './../env.js'; // Импорт функции для работы с переменными окружения
+import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
+import { saveFileToUploadDir } from '../utils/saveFileToUploadDir.js';
+
+
 
 // Контролер для отримання всіх контактів з пагінацією і сортуванням
 export async function getContactsController(req, res, next) {
@@ -74,22 +79,62 @@ export async function getContactByIdController(req, res, next) {
 }
 
 // Контролер для створення нового контакту
-export async function createContactController(req, res, next) {
+export const createContactController = async (req, res, next) => {
   try {
-    const userId = req.user._id; // Отримуємо ID поточного користувача
-    const contactData = { ...req.body, userId }; // Додаємо userId до даних контакту
+    const photo = req.file; // Получаем загруженное фото
+    console.log(req.file);
+    let photoUrl;
 
+    // Если файл фото передан, сохраняем его
+    if (photo) {
+      if (env('ENABLE_CLOUDINARY') === 'true') {
+        // Сохраняем фото в Cloudinary
+        photoUrl = await saveFileToCloudinary(photo);
+      } else {
+        // Сохраняем фото локально
+        photoUrl = await saveFileToUploadDir(photo);
+      }
+    }
+
+    // Получаем ID текущего пользователя
+    const userId = req.user._id; // Это важно для привязки контакта к пользователю
+
+    // Формируем данные для создания контакта, включая userId
+    const contactData = {
+      ...req.body, // Остальные поля запроса
+      userId, // Добавляем ID пользователя
+      photo: photoUrl, // URL фотографии
+    };
+
+    // Создаем контакт
     const newContact = await createContact(contactData);
 
+    // Возвращаем успешный ответ
     res.status(201).json({
       status: 201,
       message: 'Successfully created a contact!',
       data: newContact,
     });
   } catch (error) {
-    next(error);
+    next(error); // Обработка ошибки через middleware
   }
-}
+};
+// export async function createContactController(req, res, next) {
+//   try {
+//     const userId = req.user._id; // Отримуємо ID поточного користувача
+//     const contactData = { ...req.body, userId }; // Додаємо userId до даних контакту
+
+//     const newContact = await createContact(contactData);
+
+//     res.status(201).json({
+//       status: 201,
+//       message: 'Successfully created a contact!',
+//       data: newContact,
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// }
 
 // Контролер для оновлення існуючого контакту
 export async function updateContactController(req, res, next) {
@@ -132,3 +177,43 @@ export async function deleteContactController(req, res, next) {
     next(error);
   }
 }
+
+// Контроллер для обновления контакта
+export const patchContactController = async (req, res, next) => {
+  const photo = req.file; // Получаем файл из запроса
+  let photoUrl;
+
+  // Если есть фото, сохраняем его либо в Cloudinary, либо локально
+  if (photo) {
+    if (env('ENABLE_CLOUDINARY', 'false') === 'true') { // Проверяем значение переменной ENABLE_CLOUDINARY
+      photoUrl = await saveFileToCloudinary(photo); // Сохраняем файл в Cloudinary
+    } else {
+      photoUrl = await saveFileToUploadDir(photo); // Сохраняем файл локально
+    }
+  }
+
+  const { contactId } = req.params; // ID контакта из параметров запроса
+  const userId = req.user._id; // ID текущего пользователя
+
+  // Обновляем контакт в базе данных
+  const result = await updateContactById(
+    contactId,
+    {
+      ...req.body, // Данные из запроса
+      photo: photoUrl, // URL фотографии (если передана)
+    },
+    userId,
+  );
+
+  if (!result) {
+    next(createHttpError(404, 'Contact not found')); // Если контакт не найден, отправляем ошибку 404
+    return;
+  }
+
+  // Отправляем успешный ответ с данными обновленного контакта
+  res.status(200).json({
+    status: 200,
+    message: 'Successfully patched the contact!',
+    data: result.contact, // Возвращаем данные контакта
+  });
+};
