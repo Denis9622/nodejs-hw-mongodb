@@ -1,13 +1,12 @@
 import jwt from 'jsonwebtoken';
 import createHttpError from 'http-errors';
-import { env } from './../env.js'; // Подключение метода env для получения JWT_SECRET
+import { env } from './../env.js';
 
-const jwtSecret = env('JWT_SECRET'); // Убедитесь, что переменная загружена правильно
+const jwtSecret = env('JWT_SECRET');
 
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw createHttpError(401, 'Authorization header missing or malformed');
     }
@@ -15,7 +14,8 @@ export const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, jwtSecret);
 
-    req.user = decoded; // Если проверка прошла успешно, сохраняем данные пользователя в req
+    req.user = { _id: decoded.userId };
+
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

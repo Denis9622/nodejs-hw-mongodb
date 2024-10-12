@@ -35,10 +35,10 @@ router.post(
   ctrlWrapper(createContactController),
 );
 
-// Роут для обновления контакта (с обработкой файла и валидацией)
+// Роут для обновления контакта
 router.patch(
   '/:contactId',
-  isValidId, // Валидация ID контакта
+  isValidId, // Используем middleware для проверки ID
   upload.single('photo'), // Обработка загруженного файла (фото)
   validateBody(updateContactSchema), // Валидация обновленных данных контакта
   ctrlWrapper(patchContactController),

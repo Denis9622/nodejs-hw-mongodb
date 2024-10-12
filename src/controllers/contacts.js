@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 import createHttpError from 'http-errors';
 import {
   getAllContactsWithPagination,
@@ -6,16 +8,13 @@ import {
   updateContactById,
   deleteContactById,
 } from '../services/contacts.js';
-import { env } from './../env.js'; // Импорт функции для работы с переменными окружения
+import { env } from './../env.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { saveFileToUploadDir } from '../utils/saveFileToUploadDir.js';
 
-
-
-// Контролер для отримання всіх контактів з пагінацією і сортуванням
+// Контроллер для получения всех контактов с пагинацией и сортировкой
 export async function getContactsController(req, res, next) {
   try {
-    // Перевіряємо, чи пройшла аутентифікація і чи є користувач у запиті
     if (!req.user || !req.user._id) {
       throw createHttpError(401, 'Authentication required');
     }
@@ -25,23 +24,21 @@ export async function getContactsController(req, res, next) {
     const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
 
-    // Отримуємо лише контакти, які належать поточному користувачеві
     const { contacts, totalItems } = await getAllContactsWithPagination(
       page,
       perPage,
       sortBy,
       sortOrder,
-      { userId: req.user._id }, // Фільтр для вибірки контактів тільки поточного користувача
+      { userId: req.user._id },
     );
 
     const totalPages = Math.ceil(totalItems / perPage);
 
-    // Відправляємо успішну відповідь із даними
     res.status(200).json({
       status: 200,
       message: 'Successfully found contacts!',
       data: {
-        contacts, // Масив контактів користувача
+        contacts,
         page,
         perPage,
         totalItems,
@@ -51,17 +48,16 @@ export async function getContactsController(req, res, next) {
       },
     });
   } catch (error) {
-    next(error); // Передаємо помилку в middleware для обробки
+    next(error);
   }
 }
 
-// Контролер для отримання контакту за ID
+// Контроллер для получения контакта по ID
 export async function getContactByIdController(req, res, next) {
   try {
-    const userId = req.user._id; // ID поточного користувача
+    const userId = req.user._id;
     const { contactId } = req.params;
 
-    // Отримуємо лише контакт поточного користувача
     const contact = await getContactById(contactId, userId);
 
     if (!contact) {
@@ -78,72 +74,61 @@ export async function getContactByIdController(req, res, next) {
   }
 }
 
-// Контролер для створення нового контакту
+// Контроллер для создания нового контакта
 export const createContactController = async (req, res, next) => {
   try {
-    const photo = req.file; // Получаем загруженное фото
-    console.log(req.file);
+    const photo = req.file;
     let photoUrl;
 
-    // Если файл фото передан, сохраняем его
     if (photo) {
       if (env('ENABLE_CLOUDINARY') === 'true') {
-        // Сохраняем фото в Cloudinary
         photoUrl = await saveFileToCloudinary(photo);
       } else {
-        // Сохраняем фото локально
         photoUrl = await saveFileToUploadDir(photo);
       }
     }
 
-    // Получаем ID текущего пользователя
-    const userId = req.user._id; // Это важно для привязки контакта к пользователю
+    const userId = req.user._id;
+    if (!userId) {
+      throw createHttpError(400, 'User ID is required');
+    }
 
-    // Формируем данные для создания контакта, включая userId
     const contactData = {
-      ...req.body, // Остальные поля запроса
-      userId, // Добавляем ID пользователя
-      photo: photoUrl, // URL фотографии
+      ...req.body,
+      userId,
+      photo: photoUrl,
     };
 
-    // Создаем контакт
     const newContact = await createContact(contactData);
 
-    // Возвращаем успешный ответ
     res.status(201).json({
       status: 201,
       message: 'Successfully created a contact!',
       data: newContact,
     });
   } catch (error) {
-    next(error); // Обработка ошибки через middleware
+    next(error);
   }
 };
-// export async function createContactController(req, res, next) {
-//   try {
-//     const userId = req.user._id; // Отримуємо ID поточного користувача
-//     const contactData = { ...req.body, userId }; // Додаємо userId до даних контакту
 
-//     const newContact = await createContact(contactData);
-
-//     res.status(201).json({
-//       status: 201,
-//       message: 'Successfully created a contact!',
-//       data: newContact,
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// }
-
-// Контролер для оновлення існуючого контакту
+// Контроллер для обновления контакта
 export async function updateContactController(req, res, next) {
   try {
-    const userId = req.user._id; // Отримуємо ID поточного користувача
+    const userId = req.user._id.toString();
     const { contactId } = req.params;
 
-    // Оновлюємо лише контакт поточного користувача
-    const updatedContact = await updateContactById(contactId, userId, req.body);
+    let updateData = { ...req.body };
+
+    if (req.file) {
+      const photoUrl = await saveFileToCloudinary(req.file);
+      updateData.photo = photoUrl;
+    }
+
+    const updatedContact = await updateContactById(
+      contactId,
+      userId,
+      updateData,
+    );
 
     if (!updatedContact) {
       throw createHttpError(404, 'Contact not found');
@@ -159,61 +144,74 @@ export async function updateContactController(req, res, next) {
   }
 }
 
-// Контролер для видалення контакту
+// Контроллер для удаления контакта
 export async function deleteContactController(req, res, next) {
   try {
-    const userId = req.user._id; // Отримуємо ID поточного користувача
+    const userId = req.user._id;
     const { contactId } = req.params;
 
-    // Видаляємо лише контакт поточного користувача
     const deletedContact = await deleteContactById(contactId, userId);
 
     if (!deletedContact) {
       throw createHttpError(404, 'Contact not found');
     }
 
-    res.status(204).send(); // Статус 204 без тіла відповіді
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
 }
 
-// Контроллер для обновления контакта
 export const patchContactController = async (req, res, next) => {
-  const photo = req.file; // Получаем файл из запроса
-  let photoUrl;
+  try {
+    const { contactId } = req.params;
+    const userId = req.user._id;
 
-  // Если есть фото, сохраняем его либо в Cloudinary, либо локально
-  if (photo) {
-    if (env('ENABLE_CLOUDINARY', 'false') === 'true') { // Проверяем значение переменной ENABLE_CLOUDINARY
-      photoUrl = await saveFileToCloudinary(photo); // Сохраняем файл в Cloudinary
-    } else {
-      photoUrl = await saveFileToUploadDir(photo); // Сохраняем файл локально
+    // Проверяем валидность идентификаторов
+    if (!mongoose.Types.ObjectId.isValid(contactId)) {
+      throw createHttpError(400, 'Invalid contact ID format');
     }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw createHttpError(400, 'Invalid user ID format');
+    }
+
+    // Логируем, чтобы отследить данные
+    console.log('Contact ID:', contactId);
+    console.log('User ID:', userId);
+
+    // Получаем файл из запроса (если он есть)
+    const photo = req.file;
+    let photoUrl;
+
+    // Если есть фото, сохраняем его либо в Cloudinary, либо локально
+    if (photo) {
+      if (env('ENABLE_CLOUDINARY', 'false') === 'true') {
+        photoUrl = await saveFileToCloudinary(photo); // Сохраняем файл в Cloudinary
+      } else {
+        photoUrl = await saveFileToUploadDir(photo); // Сохраняем файл локально
+      }
+    }
+
+    // Обновление контакта с возможным новым фото
+    const updateData = {
+      ...req.body,
+      photo: photoUrl, // Если фото не было загружено, это значение будет undefined и поле не обновится
+    };
+
+    const result = await updateContactById(contactId, userId, updateData);
+
+    if (!result) {
+      throw createHttpError(404, 'Contact not found');
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successfully patched the contact!',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in patchContactController:', error);
+    next(error);
   }
-
-  const { contactId } = req.params; // ID контакта из параметров запроса
-  const userId = req.user._id; // ID текущего пользователя
-
-  // Обновляем контакт в базе данных
-  const result = await updateContactById(
-    contactId,
-    {
-      ...req.body, // Данные из запроса
-      photo: photoUrl, // URL фотографии (если передана)
-    },
-    userId,
-  );
-
-  if (!result) {
-    next(createHttpError(404, 'Contact not found')); // Если контакт не найден, отправляем ошибку 404
-    return;
-  }
-
-  // Отправляем успешный ответ с данными обновленного контакта
-  res.status(200).json({
-    status: 200,
-    message: 'Successfully patched the contact!',
-    data: result.contact, // Возвращаем данные контакта
-  });
 };
