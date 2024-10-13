@@ -104,7 +104,7 @@ export async function createUserController(req, res, next) {
 export async function loginUserController(req, res, next) {
   try {
     const { email, password } = req.body;
-
+    
     // Проверяем, переданы ли email и пароль
     if (!email || !password) {
       throw createHttpError(400, 'Email и пароль обязательны'); // Ошибка 400, если данные неполные
@@ -125,15 +125,14 @@ export async function loginUserController(req, res, next) {
     // Создаем access и refresh токены с использованием JWT
     const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
+
     });
     const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 
     const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Токен на 15 минут
-    const refreshTokenValidUntil = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000,
-    ); // Токен на 30 дней
+    const refreshTokenValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Токен на 30 дней
 
     // Создаем новую сессию и сохраняем её в базе данных
     await Session.create({
@@ -150,6 +149,7 @@ export async function loginUserController(req, res, next) {
       secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
     });
+
 
     // Возвращаем успешный ответ с access токеном
     res.status(200).json({
