@@ -209,7 +209,7 @@
                   },
                   "photo": {
                     "description": "File to upload",
-                    "type": "array",
+                    "type": "string",
                     "items": {
                       "type": "string",
                       "format": "binary"
@@ -367,7 +367,7 @@
                   },
                   "photo": {
                     "description": "File to upload",
-                    "type": "array",
+                    "type": "string",
                     "items": {
                       "type": "string",
                       "format": "binary"

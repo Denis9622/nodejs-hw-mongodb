@@ -104,43 +104,59 @@ export async function createUserController(req, res, next) {
 export async function loginUserController(req, res, next) {
   try {
     const { email, password } = req.body;
-
+    
     // Проверяем, переданы ли email и пароль
     if (!email || !password) {
-      throw createHttpError(400, 'Email и пароль обязательны');
+      throw createHttpError(400, 'Email и пароль обязательны'); // Ошибка 400, если данные неполные
     }
 
     // Ищем пользователя по email
     const user = await User.findOne({ email });
     if (!user) {
-      throw createHttpError(401, 'Неправильный email или пароль');
+      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пользователь не найден
     }
 
-    // Проверяем пароль с помощью bcrypt.compare
+    // Проверяем пароль
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw createHttpError(401, 'Неправильный email или пароль');
+      throw createHttpError(401, 'Неправильный email или пароль'); // Ошибка 401, если пароль неверный
     }
 
-    // Генерация access и refresh токенов
-    const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    // Создаем access и refresh токены с использованием JWT
+    const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
     });
-    const refreshToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
+    const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 
-    // Возвращаем успешный ответ с токенами
+    const accessTokenValidUntil = new Date(Date.now() + 15 * 60 * 1000); // Токен на 15 минут
+    const refreshTokenValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Токен на 30 дней
+
+    // Создаем новую сессию и сохраняем её в базе данных
+    await Session.create({
+      userId: user._id,
+      accessToken,
+      refreshToken,
+      accessTokenValidUntil,
+      refreshTokenValidUntil,
+    });
+
+    // Устанавливаем refresh токен в cookies (например, на 30 дней)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true, // Ограничиваем доступ к cookie только через HTTP (защита от XSS)
+      secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
+    });
+
+    // Возвращаем успешный ответ с access токеном
     res.status(200).json({
       status: 200,
       message: 'Пользователь успешно авторизован!',
-      data: {
-        accessToken,
-        refreshToken,
-      },
+      data: { accessToken },
     });
   } catch (error) {
-    next(error);
+    next(error); // Передаем ошибку в следующий middleware для обработки
   }
 }
 // Контроллер для обновления сессии (по refresh токену)
