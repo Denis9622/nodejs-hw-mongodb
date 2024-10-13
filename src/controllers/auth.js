@@ -125,6 +125,7 @@ export async function loginUserController(req, res, next) {
     // Создаем access и refresh токены с использованием JWT
     const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
+
     });
     const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET, {
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
@@ -148,6 +149,7 @@ export async function loginUserController(req, res, next) {
       secure: process.env.NODE_ENV === 'production', // Включаем secure только в продакшене
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
     });
+
 
     // Возвращаем успешный ответ с access токеном
     res.status(200).json({
@@ -225,17 +227,23 @@ export async function logoutUserController(req, res, next) {
   try {
     const { refreshToken } = req.cookies; // Получаем refresh токен из cookies
 
+    // Логирование для отладки
+    console.log('Received refreshToken:', refreshToken);
+
     // Проверяем, передан ли refresh токен
     if (!refreshToken) {
       throw createHttpError(401, 'Refresh token required'); // Ошибка 401, если токен отсутствует
     }
 
-    // Видаляємо сесію з бази даних
+    // Проверка наличия сессии в базе данных
     const session = await Session.findOneAndDelete({ refreshToken });
+
+    console.log('Session found:', session);
 
     if (!session) {
       throw createHttpError(404, 'Session not found');
     }
+
     // Очищаем cookies с refresh токеном
     res.clearCookie('refreshToken', {
       httpOnly: true,
@@ -248,6 +256,10 @@ export async function logoutUserController(req, res, next) {
     next(error); // Передаем ошибку в следующий middleware для обработки
   }
 }
+
+
+
+
 //Контролер для запиту на скидання паролю
 export const requestResetEmailController = async (req, res, next) => {
   try {
